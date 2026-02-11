@@ -400,10 +400,16 @@
         let isHyp = false;
         let angleMode = 'DEG';
         let ans = 0;
-        let vars = { x: 0 };
+        let vars = { x: 0, y: 0, z: 0, t: 0, a: 0, b: 0, c: 0 };
         let menuVisible = false;
+        let xPressCount = 0;
+        let lastKeyPress = "";
+        let cursorPos = 0;
+        let calcState = 'STANDARD'; // STANDARD, TABLE_Y, TABLE_SETUP, TABLE_VIEW
+        let tableSetup = { start: 0, step: 1, activeLine: 0 };
 
         const mathEngine = math.create(math.all);
+        // Default to BigNumber but we will handle Fractions manually for MultiView feel
         mathEngine.config({ number: 'BigNumber', precision: 20 });
 
         const lcdInput = document.getElementById('lcd-input-line');
@@ -419,65 +425,166 @@
             indHyp.textContent = isHyp ? "HYP" : "";
             indDeg.textContent = angleMode;
             if(is2nd) btn2nd.classList.add('active'); else btn2nd.classList.remove('active');
-            lcdInput.innerHTML = (inputBuffer || "0") + '<span class="cursor"></span>';
+
+            if (calcState === 'STANDARD') {
+                renderStandard();
+            } else if (calcState === 'TABLE_Y') {
+                renderTableY();
+            } else if (calcState === 'TABLE_SETUP') {
+                renderTableSetup();
+            }
+        }
+
+        function renderStandard() {
+            if (!inputBuffer && cursorPos === 0) {
+                lcdInput.innerHTML = '0<span class="cursor"></span>';
+                return;
+            }
+            renderMathPrint(inputBuffer, cursorPos);
+        }
+
+        function renderTableY() {
+            lcdInput.innerHTML = '<div>y = </div>';
+            let line = document.createElement('div');
+            renderMathPrint(inputBuffer, cursorPos, line);
+            lcdInput.appendChild(line);
+        }
+
+        function renderTableSetup() {
+            lcdInput.innerHTML = '<div style="font-size: 24px;">TABLE SETUP</div>';
+            let s1 = tableSetup.activeLine === 0 ? ">" : " ";
+            let s2 = tableSetup.activeLine === 1 ? ">" : " ";
+            lcdInput.innerHTML += `<div>${s1}Start=${tableSetup.start}</div>`;
+            lcdInput.innerHTML += `<div>${s2}Step=${tableSetup.step}</div>`;
+        }
+
+        function renderMathPrint(buffer, pos, container) {
+            try {
+                let withCursor = buffer.slice(0, pos) + "\\cursor " + buffer.slice(pos);
+                let latex = withCursor
+                    .replace(/\\cursor /g, '{\\color{black}\\rule{2px}{1.2em}}')
+                    .replace(/(\d+|\([^()]*\)|[a-z]) \/ (\d+|\([^()]*\)|[a-z])/g, '\\frac{$1}{$2}')
+                    .replace(/ \/ /g, ' \\over ')
+                    .replace(/ _ /g, ' ')
+                    .replace(/π/g, '\\pi ')
+                    .replace(/²/g, '^2')
+                    .replace(/⁻¹/g, '^{-1}')
+                    .replace(/√\(\s*/g, '\\sqrt{')
+                    .replace(/sin\(/g, '\\sin(')
+                    .replace(/cos\(/g, '\\cos(')
+                    .replace(/tan\(/g, '\\tan(')
+                    .replace(/asin\(/g, '\\sin^{-1}(')
+                    .replace(/acos\(/g, '\\cos^{-1}(')
+                    .replace(/atan\(/g, '\\tan^{-1}(')
+                    .replace(/\*/g, '\\times ');
+
+                let openBraces = (latex.match(/\{/g) || []).length;
+                let closeBraces = (latex.match(/\}/g) || []).length;
+                for(let i=0; i < openBraces - closeBraces; i++) latex += '}';
+
+                let tempSpan = document.createElement('span');
+                katex.render(latex, tempSpan, { throwOnError: false, displayMode: false });
+                if (container) {
+                    container.innerHTML = '';
+                    container.appendChild(tempSpan);
+                } else {
+                    lcdInput.innerHTML = '';
+                    lcdInput.appendChild(tempSpan);
+                }
+            } catch (e) {
+                let html = buffer + '<span class="cursor"></span>';
+                if (container) container.innerHTML = html; else lcdInput.innerHTML = html;
+            }
         }
 
         function handleInput(val) {
-            console.log("Input:", val, "is2nd:", is2nd);
+            console.log("Input:", val, "is2nd:", is2nd, "state:", calcState);
             if (menuVisible) { hideMenu(); }
             if (is2nd && val !== '2nd') {
                 is2nd = false; handle2ndAction(val); updateDisplay(); return;
             }
+
+            if (calcState === 'TABLE_SETUP') {
+                handleTableSetupInput(val);
+                updateDisplay();
+                return;
+            }
+
             switch(val) {
                 case '2nd': is2nd = !is2nd; break;
                 case 'hyp': isHyp = !isHyp; break;
                 case 'on': resetCalc(); break;
-                case 'clear': inputBuffer = ""; break;
-                case 'del': inputBuffer = inputBuffer.slice(0, -1); break;
-                case 'enter': evaluate(); break;
+                case 'clear': inputBuffer = ""; cursorPos = 0; break;
+                case 'del':
+                    if (cursorPos > 0) {
+                        inputBuffer = inputBuffer.slice(0, cursorPos - 1) + inputBuffer.slice(cursorPos);
+                        cursorPos--;
+                    }
+                    break;
+                case 'left': if (cursorPos > 0) cursorPos--; break;
+                case 'right': if (cursorPos < inputBuffer.length) cursorPos++; break;
+                case 'up': break;
+                case 'down': break;
+                case 'enter':
+                    if (calcState === 'TABLE_Y') {
+                        calcState = 'TABLE_SETUP';
+                    } else {
+                        evaluate();
+                    }
+                    break;
                 case 'mode': showMenu('MODE', ['DEG', 'RAD'], (sel) => { angleMode = sel; hideMenu(); updateDisplay(); }); break;
-                case 'neg': inputBuffer += "(-)"; break;
-                case 'pi': inputBuffer += "π"; break;
-                case 'log': inputBuffer += "log("; break;
-                case 'ln': inputBuffer += "ln("; break;
-                case 'sin': inputBuffer += (isHyp ? "sinh(" : "sin("); isHyp = false; break;
-                case 'cos': inputBuffer += (isHyp ? "cosh(" : "cos("); isHyp = false; break;
-                case 'tan': inputBuffer += (isHyp ? "tanh(" : "tan("); isHyp = false; break;
-                case 'sq': inputBuffer += "²"; break;
-                case 'inv': inputBuffer += "⁻¹"; break;
-                case 'frac': inputBuffer += " / "; break;
-                case 'ans': inputBuffer += "ans"; break;
-                case 'sci': inputBuffer += "*10^("; break;
-                case 'table': toggleGraph(); break;
+                case 'neg': insertAtCursor("(-)"); break;
+                case 'pi': insertAtCursor("π"); break;
+                case 'log': insertAtCursor("log("); break;
+                case 'ln': insertAtCursor("ln("); break;
+                case 'sin': insertAtCursor(isHyp ? "sinh(" : "sin("); isHyp = false; break;
+                case 'cos': insertAtCursor(isHyp ? "cosh(" : "cos("); isHyp = false; break;
+                case 'tan': insertAtCursor(isHyp ? "tanh(" : "tan("); isHyp = false; break;
+                case 'sq': insertAtCursor("²"); break;
+                case 'inv': insertAtCursor("⁻¹"); break;
+                case 'frac': insertAtCursor(" / "); break;
+                case 'ans': insertAtCursor("ans"); break;
+                case 'sci': insertAtCursor("*10^("); break;
+                case 'table':
+                    if (calcState === 'STANDARD') {
+                        calcState = 'TABLE_Y';
+                        inputBuffer = ""; cursorPos = 0;
+                    } else {
+                        calcState = 'STANDARD';
+                    }
+                    break;
                 case 'toggleFrac': toggleDecFrac(); break;
                 case 'prb': showPrbMenu(); break;
                 case 'data': showDataMenu(); break;
-                case 'x': inputBuffer += "x"; break;
-                default: if(!isNaN(val) || "+-*/.^()".includes(val)) inputBuffer += val;
+                case 'sto': showStoMenu(); break;
+                case 'x': handleXKey(); break;
+                default: if(!isNaN(val) || "+-*/.^()".includes(val)) insertAtCursor(val);
             }
             updateDisplay();
         }
 
         function handle2ndAction(val) {
             switch(val) {
-                case 'log': inputBuffer += "10^("; break;
-                case 'ln': inputBuffer += "e^("; break;
-                case 'sin': inputBuffer += "asin("; break;
-                case 'cos': inputBuffer += "acos("; break;
-                case 'tan': inputBuffer += "atan("; break;
-                case 'sq': inputBuffer += "√( "; break;
-                case '^': inputBuffer += "root("; break;
-                case 'frac': inputBuffer += " _ "; break;
+                case 'log': insertAtCursor("10^("); break;
+                case 'ln': insertAtCursor("e^("); break;
+                case 'sin': insertAtCursor("asin("); break;
+                case 'cos': insertAtCursor("acos("); break;
+                case 'tan': insertAtCursor("atan("); break;
+                case 'sq': insertAtCursor("√( "); break;
+                case '^': insertAtCursor("root("); break;
+                case 'frac': insertAtCursor(" _ "); break;
                 case 'table': toggleDecFrac(); break;
-                case 'neg': inputBuffer += "ans"; break;
-                case 'sto':
-                    vars.x = ans;
-                    addToHistory("ans \\rightarrow x", mathEngine.format(ans, {precision: 10}));
-                    break;
-                case 'x': inputBuffer = ""; break;
+                case 'neg': insertAtCursor("ans"); break;
+                case 'sto': showStoMenu(); break; // Actually 2nd STO is Recall
+                case 'x': inputBuffer = ""; cursorPos = 0; break;
                 case '0': resetCalc(); break;
                 default: handleInput(val);
             }
+        }
+
+        function insertAtCursor(text) {
+            inputBuffer = inputBuffer.slice(0, cursorPos) + text + inputBuffer.slice(cursorPos);
+            cursorPos += text.length;
         }
 
         function evaluate() {
@@ -490,12 +597,60 @@
                     .replace(/\(-\)/g, '-')
                     .replace(/²/g, '^2')
                     .replace(/⁻¹/g, '^-1')
-                    .replace(/ln\(/g, 'log(')
                     .replace(/log\(/g, 'log10(')
+                    .replace(/ln\(/g, 'log(')
                     .replace(/√\(\s*/g, 'sqrt(')
                     .replace(/(\d+)\s*_\s*(\d+)\s*\/\s*(\d+)/g, '($1+$2/$3)')
-                    .replace(/(\w+)\s*nPr\s*(\w+)/g, 'permutations($1, $2)')
-                    .replace(/(\w+)\s*nCr\s*(\w+)/g, 'combinations($1, $2)');
+                    .replace(/%/g, '/100');
+
+                // Handle nCr and nPr by transforming them into function calls with balanced parens
+                const transformInfix = (str, op, func) => {
+                    let res = str;
+                    while (res.includes(op)) {
+                        let idx = res.indexOf(op);
+                        let leftPart = res.substring(0, idx).trim();
+                        let rightPart = res.substring(idx + op.length).trim();
+
+                        let leftOp = "";
+                        if (leftPart.endsWith(")")) {
+                            let count = 0, i = leftPart.length - 1;
+                            for (; i >= 0; i--) {
+                                if (leftPart[i] === ")") count++;
+                                else if (leftPart[i] === "(") count--;
+                                if (count === 0) break;
+                            }
+                            leftOp = leftPart.substring(i);
+                        } else {
+                            let m = leftPart.match(/[0-9a-z.PI]+$/);
+                            leftOp = m ? m[0] : "";
+                        }
+
+                        let rightOp = "";
+                        if (rightPart.startsWith("(")) {
+                            let count = 0, i = 0;
+                            for (; i < rightPart.length; i++) {
+                                if (rightPart[i] === "(") count++;
+                                else if (rightPart[i] === ")") count--;
+                                if (count === 0) break;
+                            }
+                            rightOp = rightPart.substring(0, i + 1);
+                        } else {
+                            let m = rightPart.match(/^[0-9a-z.PI]+/);
+                            rightOp = m ? m[0] : "";
+                        }
+
+                        if (leftOp && rightOp) {
+                            let replacement = `${func}(${leftOp}, ${rightOp})`;
+                            let leftIdx = leftPart.lastIndexOf(leftOp);
+                            let rightIdx = rightPart.indexOf(rightOp);
+                            res = leftPart.substring(0, leftIdx) + replacement + rightPart.substring(rightIdx + rightOp.length);
+                        } else { break; }
+                    }
+                    return res;
+                };
+
+                evalStr = transformInfix(evalStr, 'nCr', 'combinations');
+                evalStr = transformInfix(evalStr, 'nPr', 'permutations');
 
                 const customScope = {
                     sin: x => angleMode === 'DEG' ? mathEngine.sin(mathEngine.unit(x, 'deg')) : mathEngine.sin(x),
@@ -504,16 +659,55 @@
                     asin: x => angleMode === 'DEG' ? mathEngine.unit(mathEngine.asin(x), 'rad').toNumber('deg') : mathEngine.asin(x),
                     acos: x => angleMode === 'DEG' ? mathEngine.unit(mathEngine.acos(x), 'rad').toNumber('deg') : mathEngine.acos(x),
                     atan: x => angleMode === 'DEG' ? mathEngine.unit(mathEngine.atan(x), 'rad').toNumber('deg') : mathEngine.atan(x),
+                    sinh: x => mathEngine.sinh(x),
+                    cosh: x => mathEngine.cosh(x),
+                    tanh: x => mathEngine.tanh(x),
+                    asinh: x => mathEngine.asinh(x),
+                    acosh: x => mathEngine.acosh(x),
+                    atanh: x => mathEngine.atanh(x),
                     root: (a, b) => mathEngine.nthRoot(b, a),
-                    x: vars.x
+                    x: vars.x,
+                    y: vars.y || 0,
+                    z: vars.z || 0,
+                    t: vars.t || 0,
+                    a: vars.a || 0,
+                    b: vars.b || 0,
+                    c: vars.c || 0
                 };
 
+                // Auto-close parentheses
+                let openParen = (evalStr.match(/\(/g) || []).length;
+                let closeParen = (evalStr.match(/\)/g) || []).length;
+                for (let i = 0; i < openParen - closeParen; i++) {
+                    evalStr += ")";
+                }
+
                 let result = mathEngine.evaluate(evalStr, customScope);
-                let formattedResult = mathEngine.format(result, { precision: 12 });
+
+                // MultiView behavior: Try to keep results as fractions if no decimals were used in input
+                let formattedResult;
+                const hasDecimal = /[\.0-9]*\.[0-9]+/.test(inputBuffer);
+
+                if (!hasDecimal && result % 1 !== 0) {
+                    try {
+                        let f = mathEngine.fraction(result);
+                        if (f.d < 10000) {
+                             formattedResult = f.n + " / " + f.d;
+                        } else {
+                             formattedResult = mathEngine.format(result, { precision: 12 });
+                        }
+                    } catch(e) {
+                        formattedResult = mathEngine.format(result, { precision: 12 });
+                    }
+                } else {
+                    formattedResult = mathEngine.format(result, { precision: 12 });
+                }
+
                 console.log("Result:", formattedResult);
                 addToHistory(inputBuffer, formattedResult);
                 ans = result;
                 inputBuffer = formattedResult.toString();
+                cursorPos = inputBuffer.length;
             } catch (e) {
                 console.error(e); inputBuffer = "Error";
             }
@@ -528,6 +722,36 @@
         }
 
         function showDataMenu() { showMenu('DATA', ['L1', 'L2', 'L3'], hideMenu); }
+
+        function showStoMenu() {
+            showMenu('STORE', ['x', 'y', 'z', 't', 'a', 'b', 'c'], (sel) => {
+                vars[sel] = ans;
+                addToHistory("ans \\rightarrow " + sel, mathEngine.format(ans, {precision: 10}));
+                hideMenu();
+                updateDisplay();
+            });
+        }
+
+        function handleXKey() {
+            const varList = ['x', 'y', 'z', 't', 'a', 'b', 'c'];
+            if (lastKeyPress === 'x') {
+                // Remove last variable
+                inputBuffer = inputBuffer.slice(0, cursorPos - 1) + inputBuffer.slice(cursorPos);
+                cursorPos--;
+                xPressCount = (xPressCount + 1) % varList.length;
+            } else {
+                xPressCount = 0;
+            }
+            insertAtCursor(varList[xPressCount]);
+        }
+
+        function showRecallMenu() {
+            showMenu('RECALL', ['x', 'y', 'z', 't', 'a', 'b', 'c'], (sel) => {
+                insertAtCursor(sel);
+                hideMenu();
+                updateDisplay();
+            });
+        }
 
         function showMenu(title, items, callback) {
             menuVisible = true;
@@ -603,15 +827,47 @@
             while (lcdHistory.childNodes.length > 3) lcdHistory.removeChild(lcdHistory.firstChild);
         }
 
-        function resetCalc() { inputBuffer = ""; ans = 0; lcdHistory.innerHTML = ""; is2nd = false; isHyp = false; hideMenu(); updateDisplay(); }
+        function resetCalc() {
+            inputBuffer = ""; cursorPos = 0; ans = 0;
+            lcdHistory.innerHTML = ""; is2nd = false; isHyp = false;
+            hideMenu(); calcState = 'STANDARD';
+            document.getElementById('graph-panel').style.display = 'none';
+            updateDisplay();
+        }
+
+        let tableFieldEdited = false;
+        function handleTableSetupInput(val) {
+            if (val === 'up') { tableSetup.activeLine = 0; tableFieldEdited = false; }
+            if (val === 'down') { tableSetup.activeLine = 1; tableFieldEdited = false; }
+            if (val === 'enter') {
+                calcState = 'STANDARD'; // Or TABLE_VIEW
+                showGraphPanel();
+                return;
+            }
+            if (!isNaN(val) || val === '.') {
+                let current = tableSetup.activeLine === 0 ? tableSetup.start.toString() : tableSetup.step.toString();
+                if (!tableFieldEdited) current = "";
+                current += val;
+                if (tableSetup.activeLine === 0) tableSetup.start = parseFloat(current) || 0;
+                else tableSetup.step = parseFloat(current) || 1;
+                tableFieldEdited = true;
+            }
+            if (val === 'del' || val === 'clear') {
+                if (tableSetup.activeLine === 0) tableSetup.start = 0;
+                else tableSetup.step = 1;
+            }
+        }
+
+        function showGraphPanel() {
+            const panel = document.getElementById('graph-panel');
+            panel.style.display = 'block';
+            plotGraph();
+            generateTable();
+        }
 
         function toggleGraph() {
             const panel = document.getElementById('graph-panel');
             panel.style.display = (panel.style.display === 'block') ? 'none' : 'block';
-            if (panel.style.display === 'block') {
-                plotGraph();
-                generateTable();
-            }
         }
 
         function plotGraph() {
@@ -637,8 +893,10 @@
 
             const tbody = document.getElementById('table-body');
             tbody.innerHTML = "";
-            for (let x = -5; x <= 5; x++) {
+            let xVal = tableSetup.start;
+            for (let i = 0; i < 10; i++) {
                 let y;
+                let x = xVal;
                 try {
                     // Use a simple scope for table generation
                     const tableScope = { x: x, PI: Math.PI };
@@ -650,12 +908,17 @@
                 const row = document.createElement('tr');
                 row.innerHTML = `<td>${x}</td><td>${y}</td>`;
                 tbody.appendChild(row);
+                xVal += tableSetup.step;
             }
         }
 
         document.querySelectorAll('button').forEach(btn => {
             const val = btn.getAttribute('data-val');
-            if (val) btn.addEventListener('click', (e) => { e.preventDefault(); handleInput(val); });
+            if (val) btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                handleInput(val);
+                lastKeyPress = val;
+            });
         });
         updateDisplay();
     </script>
