@@ -4,523 +4,659 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TI-30XS MultiView Simulator</title>
+    <!-- External Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://unpkg.com/d3@3/d3.min.js"></script>
+    <script src="https://unpkg.com/function-plot@1/dist/function-plot.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+
     <style>
         :root {
-            --bg-color: #3e4b59;
-            --display-bg: #9eb1a6;
-            --btn-gray: #4a4a4a;
-            --btn-white: #ffffff;
-            --btn-green: #a2c347;
-            --text-dark: #333;
-            --text-light: #fff;
-            --accent-yellow: #ffeb3b;
+            --calc-bg: #3c4858;
+            --lcd-bg: #9fb1a7;
+            --btn-dark: #3a3a3a;
+            --btn-white: #fefefe;
+            --btn-green: #90b343;
+            --btn-shadow: #1a1a1a;
+            --label-yellow: #f1e05a;
+            --text-lcd: #2a332d;
+            --menu-bg: rgba(159, 177, 167, 0.98);
         }
 
         body {
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
-            background-color: #f0f0f0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a1a;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            color: white;
+        }
+
+        #app-container {
+            display: flex;
+            gap: 40px;
+            align-items: center;
+            padding: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
         }
 
         #calculator {
-            width: 320px;
-            background-color: var(--bg-color);
-            border-radius: 20px;
-            padding: 15px;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
-            border: 2px solid #2c3e50;
+            width: 380px;
+            background: linear-gradient(135deg, var(--calc-bg) 0%, #2a333d 100%);
+            border-radius: 40px;
+            padding: 30px 25px;
+            box-shadow: 0 40px 80px rgba(0,0,0,0.9), inset 0 2px 5px rgba(255,255,255,0.1);
+            border: 2px solid #222;
+            position: relative;
             user-select: none;
         }
 
-        .header {
+        .brand-header {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
-            color: white;
-            margin-bottom: 5px;
+            margin-bottom: 20px;
+            padding: 0 5px;
         }
 
-        .brand { font-size: 10px; font-weight: bold; }
-        .model { text-align: right; }
-        .model-name { font-size: 14px; font-weight: bold; margin-bottom: -4px; }
-        .multiview { font-size: 10px; font-style: italic; }
+        .brand-text { font-size: 11px; font-weight: bold; letter-spacing: 1.5px; color: #ccc; }
+        .model-text { text-align: right; }
+        .model-name { font-size: 20px; font-weight: 900; color: #fff; margin-bottom: -4px; }
+        .multiview-tag { font-size: 13px; font-style: italic; color: #aaa; }
 
-        #display-container {
-            background-color: var(--display-bg);
-            height: 100px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            padding: 5px 10px;
-            border: 4px solid #222;
+        #lcd-outer {
+            background-color: #111;
+            padding: 10px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 0 #222;
+            position: relative;
+        }
+
+        #lcd-container {
+            background-color: var(--lcd-bg);
+            height: 150px;
+            border-radius: 4px;
+            padding: 10px;
+            box-shadow: inset 0 4px 12px rgba(0,0,0,0.5);
             display: flex;
             flex-direction: column;
-            font-family: 'Courier New', Courier, monospace;
-            color: #222;
-            overflow: hidden;
+            font-family: 'VT323', monospace;
+            color: var(--text-lcd);
             position: relative;
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+            overflow: hidden;
         }
 
-        .status-bar {
+        .lcd-status {
             display: flex;
             justify-content: flex-end;
-            font-size: 8px;
-            height: 12px;
+            font-size: 16px;
             font-weight: bold;
-            gap: 5px;
+            height: 18px;
+            gap: 12px;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+            margin-bottom: 4px;
         }
 
-        #history {
+        #lcd-content {
             flex: 1;
             display: flex;
             flex-direction: column;
-            justify-content: flex-start;
-            align-items: flex-start;
-            font-size: 12px;
-            white-space: pre;
-            overflow-y: auto;
-            width: 100%;
-            scrollbar-width: none;
+            justify-content: space-between;
         }
-        #history::-webkit-scrollbar { display: none; }
 
-        .history-item {
-            width: 100%;
+        #lcd-history {
+            flex: 1;
+            font-size: 22px;
+            opacity: 0.9;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
-            align-items: flex-start;
-            margin-bottom: 4px;
+            justify-content: flex-end;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 2px 0;
+            border-bottom: 1px dashed rgba(0,0,0,0.05);
+        }
+
+        #lcd-input-line {
+            font-size: 34px;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 40px;
+            word-break: break-all;
+            white-space: pre-wrap;
+            position: relative;
+        }
+
+        .cursor {
+            width: 14px;
+            height: 28px;
+            background-color: var(--text-lcd);
+            display: inline-block;
+            margin-left: 2px;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* Menu Overlay */
+        #menu-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--menu-bg);
+            color: var(--text-lcd);
+            z-index: 100;
+            display: none;
+            padding: 15px;
+            font-family: 'VT323', monospace;
+        }
+
+        .menu-title {
+            text-align: center;
+            font-size: 26px;
+            font-weight: bold;
+            border-bottom: 2px solid var(--text-lcd);
+            margin-bottom: 10px;
+        }
+
+        .menu-item {
+            padding: 6px;
+            font-size: 22px;
             cursor: pointer;
         }
-        .history-item:hover { background-color: rgba(0,0,0,0.05); }
-        .history-expr { font-size: 11px; color: #444; }
-        .history-res { font-size: 13px; font-weight: bold; width: 100%; text-align: right; }
 
-        #current-line {
-            height: 28px;
-            font-size: 20px;
-            display: flex;
-            justify-content: flex-start;
-            align-items: center;
-            border-top: 1px solid rgba(0,0,0,0.1);
-            white-space: pre;
-            width: 100%;
-            overflow-x: auto;
-            scrollbar-width: none;
+        .menu-item:hover {
+            background-color: rgba(0,0,0,0.1);
         }
-        #current-line::-webkit-scrollbar { display: none; }
 
+        /* Keypad Grid */
         .keypad {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
-            grid-template-rows: repeat(9, 32px);
-            gap: 10px 8px;
+            grid-template-rows: repeat(9, 42px);
+            gap: 20px 12px;
         }
 
-        button {
-            border-radius: 6px;
-            border: none;
-            font-size: 11px;
-            font-weight: bold;
-            cursor: pointer;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
+        .btn-wrapper {
             position: relative;
-            box-shadow: 0 2px 0 #111;
-            transition: all 0.05s;
-            padding: 0;
             width: 100%;
             height: 100%;
-            outline: none;
         }
 
-        button:active {
-            transform: translateY(1px);
-            box-shadow: 0 1px 0 #111;
-        }
-
-        .label-above {
+        .btn-label {
             position: absolute;
-            top: -12px;
-            font-size: 8px;
-            color: var(--accent-yellow);
+            top: -16px;
             width: 100%;
             text-align: center;
+            font-size: 11px;
+            font-weight: bold;
+            color: var(--label-yellow);
             pointer-events: none;
             white-space: nowrap;
         }
 
-        .btn-green { background-color: var(--btn-green); color: black; }
-        .btn-green.active { background-color: #fff; }
-
-        .btn-dark { background-color: var(--btn-gray); color: white; }
-        .btn-white { background-color: var(--btn-white); color: black; }
-
-        /* Arrow Pad */
-        .arrow-pad {
-            grid-column: 4 / 6;
-            grid-row: 1 / 3;
-            display: grid;
-            grid-template-areas:
-                ". up ."
-                "left . right"
-                ". down .";
-            gap: 2px;
+        button {
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+            border: none;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 5px 0 var(--btn-shadow);
+            transition: all 0.05s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            outline: none;
             position: relative;
-            background: #333;
-            border-radius: 50%;
-            padding: 2px;
-            width: 74px;
-            height: 74px;
-            margin: auto;
         }
-        .btn-arrow {
-            background-color: #444;
-            color: white;
-            border-radius: 4px;
-            font-size: 10px;
-            box-shadow: none;
-            width: 22px;
-            height: 22px;
-        }
-        .up { grid-area: up; }
-        .down { grid-area: down; }
-        .left { grid-area: left; }
-        .right { grid-area: right; }
 
-        .btn-enter { background-color: var(--btn-white); color: black; grid-row: 8 / 10; grid-column: 5; height: auto; }
+        button::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 50%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.15), transparent);
+        }
+
+        button:active {
+            transform: translateY(3px);
+            box-shadow: 0 2px 0 var(--btn-shadow);
+        }
+
+        .btn-white { background-color: var(--btn-white); color: #000; }
+        .btn-dark { background-color: var(--btn-dark); color: #fff; }
+        .btn-green { background-color: var(--btn-green); color: #000; }
+        .btn-green.active { background-color: #fff; box-shadow: 0 5px 0 #888; }
+
+        .arrow-pad-container { grid-column: 4 / 6; grid-row: 1 / 3; display: flex; justify-content: center; align-items: center; }
+        .arrow-pad { width: 110px; height: 110px; background-color: #1a1a1a; border-radius: 50%; display: grid; grid-template-areas: ". up ." "left . right" ". down ."; padding: 5px; box-shadow: inset 0 2px 10px rgba(0,0,0,0.8); border: 2px solid #333; }
+        .arrow-btn { background: #2a2a2a; box-shadow: none; width: 36px; height: 36px; font-size: 18px; color: #eee; }
+        .up { grid-area: up; margin: 0 auto; } .down { grid-area: down; margin: 0 auto; } .left { grid-area: left; } .right { grid-area: right; }
+
+        .btn-enter { grid-row: 8 / 10; grid-column: 5; height: auto; background-color: var(--btn-white); color: #000; font-size: 18px; border-radius: 12px; }
+
+        #graph-panel {
+            width: 700px;
+            height: 800px;
+            background-color: #fff;
+            border-radius: 20px;
+            padding: 20px;
+            display: none;
+            box-shadow: 0 30px 100px rgba(0,0,0,0.8);
+            color: #333;
+            border: 1px solid #ccc;
+            z-index: 200;
+            position: fixed;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            overflow-y: auto;
+        }
+
+        #table-display {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+        }
+
+        #table-display th, #table-display td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+
+        #table-display th {
+            background-color: #f2f2f2;
+        }
 
     </style>
 </head>
 <body>
-    <div id="calculator">
-        <div class="header">
-            <div class="brand">TEXAS INSTRUMENTS</div>
-            <div class="model">
-                <div class="model-name">TI-30XS</div>
-                <div class="multiview">MultiView</div>
+
+    <div id="app-container">
+        <div id="calculator">
+            <div class="brand-header">
+                <div class="brand-text">TEXAS INSTRUMENTS</div>
+                <div class="model-text">
+                    <div class="model-name">TI-30XS</div>
+                    <div class="multiview-tag">MultiView</div>
+                </div>
+            </div>
+
+            <div id="lcd-outer">
+                <div id="lcd-container">
+                    <div id="menu-overlay">
+                        <div id="menu-title" class="menu-title">MENU</div>
+                        <div id="menu-items"></div>
+                    </div>
+                    <div class="lcd-status">
+                        <span id="ind-2nd"></span>
+                        <span id="ind-hyp"></span>
+                        <span id="ind-deg">DEG</span>
+                    </div>
+                    <div id="lcd-content">
+                        <div id="lcd-history"></div>
+                        <div id="lcd-input-line">0<span class="cursor"></span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="keypad">
+                <div class="btn-wrapper"><button class="btn-green" data-val="2nd" id="btn-2nd">2nd</button></div>
+                <div class="btn-wrapper"><span class="btn-label">quit</span><button class="btn-dark" data-val="mode">mode</button></div>
+                <div class="btn-wrapper"><span class="btn-label">insert</span><button class="btn-dark" data-val="del">delete</button></div>
+                <div class="arrow-pad-container">
+                    <div class="arrow-pad">
+                        <button class="arrow-btn up" data-val="up">▲</button>
+                        <button class="arrow-btn left" data-val="left">◀</button>
+                        <button class="arrow-btn right" data-val="right">▶</button>
+                        <button class="arrow-btn down" data-val="down">▼</button>
+                    </div>
+                </div>
+
+                <div class="btn-wrapper"><span class="btn-label">Recall</span><button class="btn-dark" data-val="sci">x10<sup>n</sup></button></div>
+                <div class="btn-wrapper"><span class="btn-label">10<sup>x</sup></span><button class="btn-dark" data-val="log">log</button></div>
+                <div class="btn-wrapper"><span class="btn-label">angle</span><button class="btn-dark" data-val="prb">prb</button></div>
+                <div class="btn-wrapper"><span class="btn-label">stat</span><button class="btn-dark" data-val="data">data</button></div>
+
+                <div class="btn-wrapper"><span class="btn-label">e<sup>x</sup></span><button class="btn-dark" data-val="ln">ln</button></div>
+                <div class="btn-wrapper"><span class="btn-label">U n/d</span><button class="btn-dark" data-val="frac">n/d</button></div>
+                <div class="btn-wrapper"><button class="btn-dark" data-val="table">table</button></div>
+                <div class="btn-wrapper"><button class="btn-dark" data-val="clear">clear</button></div>
+                <div class="btn-wrapper"><button class="btn-dark" data-val="/">÷</button></div>
+
+                <div class="btn-wrapper"><button class="btn-dark" data-val="hyp">hyp</button></div>
+                <div class="btn-wrapper"><span class="btn-label">sin<sup>-1</sup></span><button class="btn-dark" data-val="sin">sin</button></div>
+                <div class="btn-wrapper"><span class="btn-label">cos<sup>-1</sup></span><button class="btn-dark" data-val="cos">cos</button></div>
+                <div class="btn-wrapper"><span class="btn-label">tan<sup>-1</sup></span><button class="btn-dark" data-val="tan">tan</button></div>
+                <div class="btn-wrapper"><button class="btn-dark" data-val="*">×</button></div>
+
+                <div class="btn-wrapper"><button class="btn-dark" data-val="pi">π</button></div>
+                <div class="btn-wrapper"><span class="btn-label"><sup>x</sup>√</span><button class="btn-dark" data-val="^">^</button></div>
+                <div class="btn-wrapper"><span class="btn-label">%</span><button class="btn-dark" data-val="(">(</button></div>
+                <div class="btn-wrapper"><span class="btn-label">▶%</span><button class="btn-dark" data-val=")">)</button></div>
+                <div class="btn-wrapper"><button class="btn-dark" data-val="-">−</button></div>
+
+                <div class="btn-wrapper"><span class="btn-label">√</span><button class="btn-dark" data-val="sq">x<sup>2</sup></button></div>
+                <div class="btn-wrapper"><button class="btn-white" data-val="7">7</button></div>
+                <div class="btn-wrapper"><button class="btn-white" data-val="8">8</button></div>
+                <div class="btn-wrapper"><button class="btn-white" data-val="9">9</button></div>
+                <div class="btn-wrapper"><button class="btn-dark" data-val="+">+</button></div>
+
+                <div class="btn-wrapper"><span class="btn-label">clear var</span><button class="btn-dark" data-val="x">x</button></div>
+                <div class="btn-wrapper"><button class="btn-white" data-val="4">4</button></div>
+                <div class="btn-wrapper"><button class="btn-white" data-val="5">5</button></div>
+                <div class="btn-wrapper"><button class="btn-white" data-val="6">6</button></div>
+                <div class="btn-wrapper"><button class="btn-dark" data-val="toggleFrac">f ↔ d</button></div>
+
+                <div class="btn-wrapper"><span class="btn-label">recall</span><button class="btn-dark" data-val="sto">sto</button></div>
+                <div class="btn-wrapper"><button class="btn-white" data-val="1">1</button></div>
+                <div class="btn-wrapper"><button class="btn-white" data-val="2">2</button></div>
+                <div class="btn-wrapper"><button class="btn-white" data-val="3">3</button></div>
+                <button class="btn-enter" data-val="enter">enter</button>
+
+                <div class="btn-wrapper"><span class="btn-label">off</span><button class="btn-dark" data-val="on">on</button></div>
+                <div class="btn-wrapper"><span class="btn-label">reset</span><button class="btn-white" data-val="0">0</button></div>
+                <div class="btn-wrapper"><button class="btn-white" data-val=".">.</button></div>
+                <div class="btn-wrapper"><span class="btn-label">ans</span><button class="btn-white" data-val="neg">(-)</button></div>
             </div>
         </div>
 
-        <div id="display-container">
-            <div class="status-bar"><span id="mode-2nd"></span> <span id="mode-angle">RAD</span></div>
-            <div id="history"></div>
-            <div id="current-line">0</div>
-        </div>
-
-        <div class="keypad">
-            <!-- Row 1 -->
-            <button class="btn-green" data-val="2nd" id="btn-2nd">2nd</button>
-            <button class="btn-dark" data-val="mode"><span class="label-above">quit</span>mode</button>
-            <button class="btn-dark" data-val="delete"><span class="label-above">insert</span>delete</button>
-            <div class="arrow-pad">
-                <button class="btn-arrow up" data-val="up">▲</button>
-                <button class="btn-arrow left" data-val="left">◀</button>
-                <button class="btn-arrow right" data-val="right">▶</button>
-                <button class="btn-arrow down" data-val="down">▼</button>
+        <div id="graph-panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h2 style="margin:0">Function Table / Graph</h2>
+                <button onclick="toggleGraph()" style="width: 80px; height: 35px; box-shadow: none;">Close</button>
             </div>
-
-            <!-- Row 2 -->
-            <button class="btn-dark" data-val="log"><span class="label-above">10<sup>x</sup></span>log</button>
-            <button class="btn-dark" data-val="prb"><span class="label-above">angle</span>prb</button>
-            <button class="btn-dark" data-val="data"><span class="label-above">stat</span>data</button>
-
-            <!-- Row 3 -->
-            <button class="btn-dark" data-val="ln"><span class="label-above">e<sup>x</sup></span>ln</button>
-            <button class="btn-dark" data-val="frac"><span class="label-above">U n/d</span>n/d</button>
-            <button class="btn-dark" data-val="table">table</button>
-            <button class="btn-dark" data-val="clear">clear</button>
-            <button class="btn-dark" data-val="/">&divide;</button>
-
-            <!-- Row 4 -->
-            <button class="btn-dark" data-val="pi"><span class="label-above">hyp</span>&pi;</button>
-            <button class="btn-dark" data-val="sin"><span class="label-above">sin<sup>-1</sup></span>sin</button>
-            <button class="btn-dark" data-val="cos"><span class="label-above">cos<sup>-1</sup></span>cos</button>
-            <button class="btn-dark" data-val="tan"><span class="label-above">tan<sup>-1</sup></span>tan</button>
-            <button class="btn-dark" data-val="*">&times;</button>
-
-            <!-- Row 5 -->
-            <button class="btn-dark" data-val="^"><span class="label-above">&radic;</span>^</button>
-            <button class="btn-dark" data-val="inv">x<sup>-1</sup></button>
-            <button class="btn-dark" data-val="(">(</button>
-            <button class="btn-dark" data-val=")">)</button>
-            <button class="btn-dark" data-val="-">-</button>
-
-            <!-- Row 6 -->
-            <button class="btn-dark" data-val="sq">x<sup>2</sup></button>
-            <button class="btn-white" data-val="7">7</button>
-            <button class="btn-white" data-val="8">8</button>
-            <button class="btn-white" data-val="9">9</button>
-            <button class="btn-dark" data-val="+">+</button>
-
-            <!-- Row 7 -->
-            <button class="btn-dark" data-val="x"><span class="label-above">clear var</span>x</button>
-            <button class="btn-white" data-val="4">4</button>
-            <button class="btn-white" data-val="5">5</button>
-            <button class="btn-white" data-val="6">6</button>
-            <div style="grid-column: 5; grid-row: 7;"></div> <!-- Spacer -->
-
-            <!-- Row 8 -->
-            <button class="btn-dark" data-val="sto"><span class="label-above">recall</span>sto</button>
-            <button class="btn-white" data-val="1">1</button>
-            <button class="btn-white" data-val="2">2</button>
-            <button class="btn-white" data-val="3">3</button>
-            <button class="btn-enter" data-val="enter">enter</button>
-
-            <!-- Row 9 -->
-            <button class="btn-dark" data-val="on"><span class="label-above">off</span>on</button>
-            <button class="btn-white" data-val="0">0</button>
-            <button class="btn-white" data-val=".">.</button>
-            <button class="btn-white" data-val="neg"><span class="label-above">ans</span>(-)</button>
+            <div id="graph-display" style="width:100%; height:400px; background:#fafafa; border:1px solid #ccc; border-radius:8px;"></div>
+            <div style="margin-top:15px; font-weight: bold; font-size: 20px; color: #222;">
+                Plotting: <span id="graph-expr-label" style="color:#007bff">y = x</span>
+            </div>
+            <div id="numeric-table-container">
+                <table id="table-display">
+                    <thead>
+                        <tr><th>x</th><th>f(x)</th></tr>
+                    </thead>
+                    <tbody id="table-body"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
     <script>
-        const historyEl = document.getElementById('history');
-        const currentLineEl = document.getElementById('current-line');
-        const mode2ndEl = document.getElementById('mode-2nd');
-        const modeAngleEl = document.getElementById('mode-angle');
-        const btn2nd = document.getElementById('btn-2nd');
-
-        let currentInput = "";
+        let inputBuffer = "";
         let is2nd = false;
+        let isHyp = false;
+        let angleMode = 'DEG';
         let ans = 0;
-        let angleMode = 'RAD';
-        let lastActionWasEnter = false;
+        let vars = { x: 0 };
+        let menuVisible = false;
 
         const mathEngine = math.create(math.all);
-        mathEngine.config({
-            number: 'BigNumber',
-            precision: 20
-        });
+        mathEngine.config({ number: 'BigNumber', precision: 20 });
+
+        const lcdInput = document.getElementById('lcd-input-line');
+        const lcdHistory = document.getElementById('lcd-history');
+        const ind2nd = document.getElementById('ind-2nd');
+        const indHyp = document.getElementById('ind-hyp');
+        const indDeg = document.getElementById('ind-deg');
+        const btn2nd = document.getElementById('btn-2nd');
+        const menuOverlay = document.getElementById('menu-overlay');
 
         function updateDisplay() {
-            currentLineEl.textContent = currentInput || "0";
-            mode2ndEl.textContent = is2nd ? "2nd" : "";
-            modeAngleEl.textContent = angleMode;
-            if (is2nd) btn2nd.classList.add('active');
-            else btn2nd.classList.remove('active');
-
-            currentLineEl.scrollLeft = currentLineEl.scrollWidth;
-        }
-
-        function isOperator(val) {
-            return ['+', '-', '*', '/', '^', 'sq', 'inv'].includes(val);
-        }
-
-        function isControl(val) {
-            return ['2nd', 'mode', 'up', 'down', 'left', 'right', 'delete', 'clear'].includes(val);
+            ind2nd.textContent = is2nd ? "2nd" : "";
+            indHyp.textContent = isHyp ? "HYP" : "";
+            indDeg.textContent = angleMode;
+            if(is2nd) btn2nd.classList.add('active'); else btn2nd.classList.remove('active');
+            lcdInput.innerHTML = (inputBuffer || "0") + '<span class="cursor"></span>';
         }
 
         function handleInput(val) {
+            console.log("Input:", val, "is2nd:", is2nd);
+            if (menuVisible) { hideMenu(); }
             if (is2nd && val !== '2nd') {
-                is2nd = false; // Set this to false before calling handle2ndInput to prevent recursion
-                handle2ndInput(val);
-                updateDisplay();
-                return;
+                is2nd = false; handle2ndAction(val); updateDisplay(); return;
             }
-
-            if (lastActionWasEnter && !isControl(val)) {
-                if (!isOperator(val)) {
-                    currentInput = "";
-                }
-                lastActionWasEnter = false;
-            }
-
             switch(val) {
-                case '2nd':
-                    is2nd = !is2nd;
-                    break;
-                case 'mode':
-                    angleMode = (angleMode === 'RAD' ? 'DEG' : 'RAD');
-                    break;
-                case 'enter':
-                    evaluate();
-                    break;
-                case 'clear':
-                    currentInput = "";
-                    lastActionWasEnter = false;
-                    break;
-                case 'delete':
-                    if (currentInput.length > 0) {
-                        currentInput = currentInput.slice(0, -1);
-                    }
-                    break;
-                case 'neg':
-                    currentInput += "-";
-                    break;
-                case 'sq':
-                    currentInput += "^2";
-                    break;
-                case 'inv':
-                    currentInput += "^-1";
-                    break;
-                case 'pi':
-                    currentInput += "pi";
-                    break;
-                case 'log':
-                    currentInput += "log10(";
-                    break;
-                case 'ln':
-                    currentInput += "log(";
-                    break;
-                case 'sin':
-                case 'cos':
-                case 'tan':
-                    currentInput += val + "(";
-                    break;
-                case 'x':
-                    currentInput += "x";
-                    break;
-                case 'up':
-                    if (historyEl.lastChild) {
-                        currentInput = historyEl.lastChild.querySelector('.history-expr').textContent;
-                        lastActionWasEnter = false;
-                    }
-                    break;
-                case 'down':
-                    currentInput = "";
-                    lastActionWasEnter = false;
-                    break;
-                default:
-                    currentInput += val;
+                case '2nd': is2nd = !is2nd; break;
+                case 'hyp': isHyp = !isHyp; break;
+                case 'on': resetCalc(); break;
+                case 'clear': inputBuffer = ""; break;
+                case 'del': inputBuffer = inputBuffer.slice(0, -1); break;
+                case 'enter': evaluate(); break;
+                case 'mode': showMenu('MODE', ['DEG', 'RAD'], (sel) => { angleMode = sel; hideMenu(); updateDisplay(); }); break;
+                case 'neg': inputBuffer += "(-)"; break;
+                case 'pi': inputBuffer += "π"; break;
+                case 'log': inputBuffer += "log("; break;
+                case 'ln': inputBuffer += "ln("; break;
+                case 'sin': inputBuffer += (isHyp ? "sinh(" : "sin("); isHyp = false; break;
+                case 'cos': inputBuffer += (isHyp ? "cosh(" : "cos("); isHyp = false; break;
+                case 'tan': inputBuffer += (isHyp ? "tanh(" : "tan("); isHyp = false; break;
+                case 'sq': inputBuffer += "²"; break;
+                case 'inv': inputBuffer += "⁻¹"; break;
+                case 'frac': inputBuffer += " / "; break;
+                case 'ans': inputBuffer += "ans"; break;
+                case 'sci': inputBuffer += "*10^("; break;
+                case 'table': toggleGraph(); break;
+                case 'toggleFrac': toggleDecFrac(); break;
+                case 'prb': showPrbMenu(); break;
+                case 'data': showDataMenu(); break;
+                case 'x': inputBuffer += "x"; break;
+                default: if(!isNaN(val) || "+-*/.^()".includes(val)) inputBuffer += val;
             }
             updateDisplay();
         }
 
-        function handle2ndInput(val) {
+        function handle2ndAction(val) {
             switch(val) {
-                case 'on': // off
-                    currentInput = "";
-                    historyEl.innerHTML = "";
-                    ans = 0;
-                    lastActionWasEnter = false;
+                case 'log': inputBuffer += "10^("; break;
+                case 'ln': inputBuffer += "e^("; break;
+                case 'sin': inputBuffer += "asin("; break;
+                case 'cos': inputBuffer += "acos("; break;
+                case 'tan': inputBuffer += "atan("; break;
+                case 'sq': inputBuffer += "√( "; break;
+                case '^': inputBuffer += "root("; break;
+                case 'frac': inputBuffer += " _ "; break;
+                case 'table': toggleDecFrac(); break;
+                case 'neg': inputBuffer += "ans"; break;
+                case 'sto':
+                    vars.x = ans;
+                    addToHistory("ans \\rightarrow x", mathEngine.format(ans, {precision: 10}));
                     break;
-                case 'neg': // ans
-                    currentInput += "ans";
-                    break;
-                case 'sin': // sin-1
-                    currentInput += "asin(";
-                    break;
-                case 'cos': // cos-1
-                    currentInput += "acos(";
-                    break;
-                case 'tan': // tan-1
-                    currentInput += "atan(";
-                    break;
-                case 'log': // 10^x
-                    currentInput += "10^";
-                    break;
-                case 'ln': // e^x
-                    currentInput += "exp(";
-                    break;
-                case '^': // sqrt
-                    currentInput += "sqrt(";
-                    break;
-                case 'prb': // angle
-                    angleMode = (angleMode === 'RAD' ? 'DEG' : 'RAD');
-                    break;
-                default:
-                    // If no 2nd function mapped, treat as normal input
-                    handleInput(val);
+                case 'x': inputBuffer = ""; break;
+                case '0': resetCalc(); break;
+                default: handleInput(val);
             }
         }
 
         function evaluate() {
-            if (!currentInput) return;
-            let exprToSave = currentInput;
+            if (!inputBuffer) return;
+            console.log("Evaluating:", inputBuffer);
             try {
-                let expr = currentInput;
+                let evalStr = inputBuffer
+                    .replace(/π/g, 'PI')
+                    .replace(/ans/g, `(${ans})`)
+                    .replace(/\(-\)/g, '-')
+                    .replace(/²/g, '^2')
+                    .replace(/⁻¹/g, '^-1')
+                    .replace(/ln\(/g, 'log(')
+                    .replace(/log\(/g, 'log10(')
+                    .replace(/√\(\s*/g, 'sqrt(')
+                    .replace(/(\d+)\s*_\s*(\d+)\s*\/\s*(\d+)/g, '($1+$2/$3)')
+                    .replace(/(\w+)\s*nPr\s*(\w+)/g, 'permutations($1, $2)')
+                    .replace(/(\w+)\s*nCr\s*(\w+)/g, 'combinations($1, $2)');
 
-                const scope = {
-                    ans: ans,
-                    x: 0,
+                const customScope = {
                     sin: x => angleMode === 'DEG' ? mathEngine.sin(mathEngine.unit(x, 'deg')) : mathEngine.sin(x),
                     cos: x => angleMode === 'DEG' ? mathEngine.cos(mathEngine.unit(x, 'deg')) : mathEngine.cos(x),
                     tan: x => angleMode === 'DEG' ? mathEngine.tan(mathEngine.unit(x, 'deg')) : mathEngine.tan(x),
-                    asin: x => {
-                        const res = mathEngine.asin(x);
-                        return angleMode === 'DEG' ? mathEngine.unit(res, 'rad').toNumber('deg') : res;
-                    },
-                    acos: x => {
-                        const res = mathEngine.acos(x);
-                        return angleMode === 'DEG' ? mathEngine.unit(res, 'rad').toNumber('deg') : res;
-                    },
-                    atan: x => {
-                        const res = mathEngine.atan(x);
-                        return angleMode === 'DEG' ? mathEngine.unit(res, 'rad').toNumber('deg') : res;
-                    }
+                    asin: x => angleMode === 'DEG' ? mathEngine.unit(mathEngine.asin(x), 'rad').toNumber('deg') : mathEngine.asin(x),
+                    acos: x => angleMode === 'DEG' ? mathEngine.unit(mathEngine.acos(x), 'rad').toNumber('deg') : mathEngine.acos(x),
+                    atan: x => angleMode === 'DEG' ? mathEngine.unit(mathEngine.atan(x), 'rad').toNumber('deg') : mathEngine.atan(x),
+                    root: (a, b) => mathEngine.nthRoot(b, a),
+                    x: vars.x
                 };
 
-                let result = mathEngine.evaluate(expr, scope);
-
-                let formattedResult;
-                if (typeof result === 'number' || result.isBigNumber || result.isComplex) {
-                    formattedResult = mathEngine.format(result, { precision: 10 });
-                } else {
-                    formattedResult = result.toString();
-                }
-
-                const item = document.createElement('div');
-                item.className = 'history-item';
-                item.onclick = () => {
-                    currentInput = exprToSave;
-                    lastActionWasEnter = false;
-                    updateDisplay();
-                };
-
-                const exprDiv = document.createElement('div');
-                exprDiv.className = 'history-expr';
-                exprDiv.textContent = exprToSave;
-
-                const resDiv = document.createElement('div');
-                resDiv.className = 'history-res';
-                resDiv.textContent = formattedResult;
-
-                item.appendChild(exprDiv);
-                item.appendChild(resDiv);
-                historyEl.appendChild(item);
-
-                historyEl.scrollTop = historyEl.scrollHeight;
-
+                let result = mathEngine.evaluate(evalStr, customScope);
+                let formattedResult = mathEngine.format(result, { precision: 12 });
+                console.log("Result:", formattedResult);
+                addToHistory(inputBuffer, formattedResult);
                 ans = result;
-                currentInput = formattedResult;
-                lastActionWasEnter = true;
+                inputBuffer = formattedResult.toString();
             } catch (e) {
-                console.error(e);
-                currentInput = "Error";
-                lastActionWasEnter = true;
+                console.error(e); inputBuffer = "Error";
             }
             updateDisplay();
         }
 
-        document.querySelectorAll('button').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                handleInput(btn.getAttribute('data-val'));
+        function showPrbMenu() {
+            showMenu('PRB', ['nPr', 'nCr', '!', 'rand'], (sel) => {
+                if(sel === '!') inputBuffer += "!"; else if(sel === 'rand') inputBuffer += "random()"; else inputBuffer += " " + sel + " ";
+                hideMenu(); updateDisplay();
             });
-        });
+        }
 
-        document.addEventListener('keydown', (e) => {
-            if (e.key >= '0' && e.key <= '9') handleInput(e.key);
-            if (e.key === '.') handleInput('.');
-            if (e.key === '+') handleInput('+');
-            if (e.key === '-') handleInput('-');
-            if (e.key === '*') handleInput('*');
-            if (e.key === '/') handleInput('/');
-            if (e.key === '(') handleInput('(');
-            if (e.key === ')') handleInput(')');
-            if (e.key === 'Enter') handleInput('enter');
-            if (e.key === 'Backspace') handleInput('delete');
-            if (e.key === 'Escape') handleInput('clear');
-        });
+        function showDataMenu() { showMenu('DATA', ['L1', 'L2', 'L3'], hideMenu); }
 
+        function showMenu(title, items, callback) {
+            menuVisible = true;
+            document.getElementById('menu-title').textContent = title;
+            const container = document.getElementById('menu-items');
+            container.innerHTML = "";
+            items.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'menu-item';
+                div.innerHTML = `<span>${index+1}: ${item}</span>`;
+                div.onclick = (e) => { e.stopPropagation(); callback(item); };
+                container.appendChild(div);
+            });
+            menuOverlay.style.display = 'block';
+        }
+
+        function hideMenu() { menuVisible = false; menuOverlay.style.display = 'none'; }
+
+        function toggleDecFrac() {
+            try {
+                // Determine current state
+                const hasSlash = inputBuffer.includes("/");
+                const hasUnderscore = inputBuffer.includes("_");
+
+                // We need the numeric value to convert
+                let val;
+                if (hasSlash) {
+                    let evalStr = inputBuffer.replace(/(\d+)\s*_\s*(\d+)\s*\/\s*(\d+)/g, '($1+$2/$3)');
+                    val = mathEngine.evaluate(evalStr);
+                } else {
+                    val = parseFloat(inputBuffer);
+                }
+
+                if (isNaN(val) || val === null) return;
+
+                if (!hasSlash) {
+                    // State: Decimal -> Simple Fraction
+                    let f = mathEngine.fraction(val);
+                    inputBuffer = f.n + " / " + f.d;
+                } else if (!hasUnderscore && Math.abs(val) > 1) {
+                    // State: Simple Fraction -> Mixed Fraction (only if |val| > 1)
+                    let f = mathEngine.fraction(val);
+                    let whole = Math.floor(f.n / f.d);
+                    let rem = f.n % f.d;
+                    if (rem === 0) {
+                        inputBuffer = whole.toString();
+                    } else {
+                        inputBuffer = whole + " _ " + rem + " / " + f.d;
+                    }
+                } else {
+                    // State: Mixed Fraction (or Simple < 1) -> Decimal
+                    inputBuffer = mathEngine.format(val, { precision: 10 });
+                }
+            } catch(e) { console.error(e); }
+            updateDisplay();
+        }
+
+        function addToHistory(expr, res) {
+            const entry = document.createElement('div');
+            entry.className = 'history-item';
+            const exprSpan = document.createElement('span');
+            const resSpan = document.createElement('span');
+            let latexExpr = expr
+                .replace(/(\d+)\s*_\s*(\d+)\s*\/\s*(\d+)/g, '$1\\frac{$2}{$3}')
+                .replace(/(\d+)\s*\/\s*(\d+)/g, '\\frac{$1}{$2}')
+                .replace(/π/g, '\\pi ')
+                .replace(/√\(\s*/g, '\\sqrt{')
+                .replace(/²/g, '^2')
+                .replace(/⁻¹/g, '^{-1}');
+            try { katex.render(latexExpr, exprSpan, { throwOnError: false, fontSize: '0.8em' }); resSpan.textContent = res; } catch(e) { exprSpan.textContent = expr; resSpan.textContent = res; }
+            entry.appendChild(exprSpan); entry.appendChild(resSpan);
+            lcdHistory.appendChild(entry);
+            while (lcdHistory.childNodes.length > 3) lcdHistory.removeChild(lcdHistory.firstChild);
+        }
+
+        function resetCalc() { inputBuffer = ""; ans = 0; lcdHistory.innerHTML = ""; is2nd = false; isHyp = false; hideMenu(); updateDisplay(); }
+
+        function toggleGraph() {
+            const panel = document.getElementById('graph-panel');
+            panel.style.display = (panel.style.display === 'block') ? 'none' : 'block';
+            if (panel.style.display === 'block') {
+                plotGraph();
+                generateTable();
+            }
+        }
+
+        function plotGraph() {
+            let expr = inputBuffer || "x";
+            let plotExpr = expr
+                .replace(/ans/g, ans.toString())
+                .replace(/π/g, 'PI')
+                .replace(/²/g, '^2')
+                .replace(/⁻¹/g, '^-1')
+                .replace(/√\(\s*/g, 'sqrt(');
+            document.getElementById('graph-expr-label').textContent = "y = " + expr;
+            try { functionPlot({ target: '#graph-display', data: [{ fn: plotExpr, sampler: 'builtIn', graphType: 'polyline' }], grid: true }); } catch (e) { console.error("Plot error", e); }
+        }
+
+        function generateTable() {
+            let expr = inputBuffer || "x";
+            let cleanExpr = expr
+                .replace(/ans/g, ans.toString())
+                .replace(/π/g, 'PI')
+                .replace(/²/g, '^2')
+                .replace(/⁻¹/g, '^-1')
+                .replace(/√\(\s*/g, 'sqrt(');
+
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = "";
+            for (let x = -5; x <= 5; x++) {
+                let y;
+                try {
+                    // Use a simple scope for table generation
+                    const tableScope = { x: x, PI: Math.PI };
+                    y = mathEngine.evaluate(cleanExpr, tableScope);
+                    y = mathEngine.format(y, { precision: 6 });
+                } catch (e) {
+                    y = "Error";
+                }
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${x}</td><td>${y}</td>`;
+                tbody.appendChild(row);
+            }
+        }
+
+        document.querySelectorAll('button').forEach(btn => {
+            const val = btn.getAttribute('data-val');
+            if (val) btn.addEventListener('click', (e) => { e.preventDefault(); handleInput(val); });
+        });
         updateDisplay();
     </script>
 </body>
