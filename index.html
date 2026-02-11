@@ -321,8 +321,8 @@
 
         function handleInput(val) {
             if (is2nd && val !== '2nd') {
+                is2nd = false; // Set this to false before calling handle2ndInput to prevent recursion
                 handle2ndInput(val);
-                is2nd = false;
                 updateDisplay();
                 return;
             }
@@ -428,6 +428,7 @@
                     angleMode = (angleMode === 'RAD' ? 'DEG' : 'RAD');
                     break;
                 default:
+                    // If no 2nd function mapped, treat as normal input
                     handleInput(val);
             }
         }
@@ -438,7 +439,6 @@
             try {
                 let expr = currentInput;
 
-                // Redefine trig functions in scope for DEG mode
                 const scope = {
                     ans: ans,
                     x: 0,
