@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TI-30XS MultiView Simulator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+    <style>
+        :root {
+            --bg-color: #3e4b59;
+            --display-bg: #9eb1a6;
+            --btn-gray: #4a4a4a;
+            --btn-white: #ffffff;
+            --btn-green: #a2c347;
+            --text-dark: #333;
+            --text-light: #fff;
+            --accent-yellow: #ffeb3b;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #calculator {
+            width: 320px;
+            background-color: var(--bg-color);
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            border: 2px solid #2c3e50;
+            user-select: none;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            color: white;
+            margin-bottom: 5px;
+        }
+
+        .brand { font-size: 10px; font-weight: bold; }
+        .model { text-align: right; }
+        .model-name { font-size: 14px; font-weight: bold; margin-bottom: -4px; }
+        .multiview { font-size: 10px; font-style: italic; }
+
+        #display-container {
+            background-color: var(--display-bg);
+            height: 100px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            padding: 5px 10px;
+            border: 4px solid #222;
+            display: flex;
+            flex-direction: column;
+            font-family: 'Courier New', Courier, monospace;
+            color: #222;
+            overflow: hidden;
+            position: relative;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: flex-end;
+            font-size: 8px;
+            height: 12px;
+            font-weight: bold;
+            gap: 5px;
+        }
+
+        #history {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: flex-start;
+            font-size: 12px;
+            white-space: pre;
+            overflow-y: auto;
+            width: 100%;
+            scrollbar-width: none;
+        }
+        #history::-webkit-scrollbar { display: none; }
+
+        .history-item {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            margin-bottom: 4px;
+            cursor: pointer;
+        }
+        .history-item:hover { background-color: rgba(0,0,0,0.05); }
+        .history-expr { font-size: 11px; color: #444; }
+        .history-res { font-size: 13px; font-weight: bold; width: 100%; text-align: right; }
+
+        #current-line {
+            height: 28px;
+            font-size: 20px;
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            border-top: 1px solid rgba(0,0,0,0.1);
+            white-space: pre;
+            width: 100%;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+        #current-line::-webkit-scrollbar { display: none; }
+
+        .keypad {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            grid-template-rows: repeat(9, 32px);
+            gap: 10px 8px;
+        }
+
+        button {
+            border-radius: 6px;
+            border: none;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            box-shadow: 0 2px 0 #111;
+            transition: all 0.05s;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            outline: none;
+        }
+
+        button:active {
+            transform: translateY(1px);
+            box-shadow: 0 1px 0 #111;
+        }
+
+        .label-above {
+            position: absolute;
+            top: -12px;
+            font-size: 8px;
+            color: var(--accent-yellow);
+            width: 100%;
+            text-align: center;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        .btn-green { background-color: var(--btn-green); color: black; }
+        .btn-green.active { background-color: #fff; }
+
+        .btn-dark { background-color: var(--btn-gray); color: white; }
+        .btn-white { background-color: var(--btn-white); color: black; }
+
+        /* Arrow Pad */
+        .arrow-pad {
+            grid-column: 4 / 6;
+            grid-row: 1 / 3;
+            display: grid;
+            grid-template-areas:
+                ". up ."
+                "left . right"
+                ". down .";
+            gap: 2px;
+            position: relative;
+            background: #333;
+            border-radius: 50%;
+            padding: 2px;
+            width: 74px;
+            height: 74px;
+            margin: auto;
+        }
+        .btn-arrow {
+            background-color: #444;
+            color: white;
+            border-radius: 4px;
+            font-size: 10px;
+            box-shadow: none;
+            width: 22px;
+            height: 22px;
+        }
+        .up { grid-area: up; }
+        .down { grid-area: down; }
+        .left { grid-area: left; }
+        .right { grid-area: right; }
+
+        .btn-enter { background-color: var(--btn-white); color: black; grid-row: 8 / 10; grid-column: 5; height: auto; }
+
+    </style>
+</head>
+<body>
+    <div id="calculator">
+        <div class="header">
+            <div class="brand">TEXAS INSTRUMENTS</div>
+            <div class="model">
+                <div class="model-name">TI-30XS</div>
+                <div class="multiview">MultiView</div>
+            </div>
+        </div>
+
+        <div id="display-container">
+            <div class="status-bar"><span id="mode-2nd"></span> <span id="mode-angle">RAD</span></div>
+            <div id="history"></div>
+            <div id="current-line">0</div>
+        </div>
+
+        <div class="keypad">
+            <!-- Row 1 -->
+            <button class="btn-green" data-val="2nd" id="btn-2nd">2nd</button>
+            <button class="btn-dark" data-val="mode"><span class="label-above">quit</span>mode</button>
+            <button class="btn-dark" data-val="delete"><span class="label-above">insert</span>delete</button>
+            <div class="arrow-pad">
+                <button class="btn-arrow up" data-val="up">▲</button>
+                <button class="btn-arrow left" data-val="left">◀</button>
+                <button class="btn-arrow right" data-val="right">▶</button>
+                <button class="btn-arrow down" data-val="down">▼</button>
+            </div>
+
+            <!-- Row 2 -->
+            <button class="btn-dark" data-val="log"><span class="label-above">10<sup>x</sup></span>log</button>
+            <button class="btn-dark" data-val="prb"><span class="label-above">angle</span>prb</button>
+            <button class="btn-dark" data-val="data"><span class="label-above">stat</span>data</button>
+
+            <!-- Row 3 -->
+            <button class="btn-dark" data-val="ln"><span class="label-above">e<sup>x</sup></span>ln</button>
+            <button class="btn-dark" data-val="frac"><span class="label-above">U n/d</span>n/d</button>
+            <button class="btn-dark" data-val="table">table</button>
+            <button class="btn-dark" data-val="clear">clear</button>
+            <button class="btn-dark" data-val="/">&divide;</button>
+
+            <!-- Row 4 -->
+            <button class="btn-dark" data-val="pi"><span class="label-above">hyp</span>&pi;</button>
+            <button class="btn-dark" data-val="sin"><span class="label-above">sin<sup>-1</sup></span>sin</button>
+            <button class="btn-dark" data-val="cos"><span class="label-above">cos<sup>-1</sup></span>cos</button>
+            <button class="btn-dark" data-val="tan"><span class="label-above">tan<sup>-1</sup></span>tan</button>
+            <button class="btn-dark" data-val="*">&times;</button>
+
+            <!-- Row 5 -->
+            <button class="btn-dark" data-val="^"><span class="label-above">&radic;</span>^</button>
+            <button class="btn-dark" data-val="inv">x<sup>-1</sup></button>
+            <button class="btn-dark" data-val="(">(</button>
+            <button class="btn-dark" data-val=")">)</button>
+            <button class="btn-dark" data-val="-">-</button>
+
+            <!-- Row 6 -->
+            <button class="btn-dark" data-val="sq">x<sup>2</sup></button>
+            <button class="btn-white" data-val="7">7</button>
+            <button class="btn-white" data-val="8">8</button>
+            <button class="btn-white" data-val="9">9</button>
+            <button class="btn-dark" data-val="+">+</button>
+
+            <!-- Row 7 -->
+            <button class="btn-dark" data-val="x"><span class="label-above">clear var</span>x</button>
+            <button class="btn-white" data-val="4">4</button>
+            <button class="btn-white" data-val="5">5</button>
+            <button class="btn-white" data-val="6">6</button>
+            <div style="grid-column: 5; grid-row: 7;"></div> <!-- Spacer -->
+
+            <!-- Row 8 -->
+            <button class="btn-dark" data-val="sto"><span class="label-above">recall</span>sto</button>
+            <button class="btn-white" data-val="1">1</button>
+            <button class="btn-white" data-val="2">2</button>
+            <button class="btn-white" data-val="3">3</button>
+            <button class="btn-enter" data-val="enter">enter</button>
+
+            <!-- Row 9 -->
+            <button class="btn-dark" data-val="on"><span class="label-above">off</span>on</button>
+            <button class="btn-white" data-val="0">0</button>
+            <button class="btn-white" data-val=".">.</button>
+            <button class="btn-white" data-val="neg"><span class="label-above">ans</span>(-)</button>
+        </div>
+    </div>
+
+    <script>
+        const historyEl = document.getElementById('history');
+        const currentLineEl = document.getElementById('current-line');
+        const mode2ndEl = document.getElementById('mode-2nd');
+        const modeAngleEl = document.getElementById('mode-angle');
+        const btn2nd = document.getElementById('btn-2nd');
+
+        let currentInput = "";
+        let is2nd = false;
+        let ans = 0;
+        let angleMode = 'RAD';
+        let lastActionWasEnter = false;
+
+        const mathEngine = math.create(math.all);
+        mathEngine.config({
+            number: 'BigNumber',
+            precision: 20
+        });
+
+        function updateDisplay() {
+            currentLineEl.textContent = currentInput || "0";
+            mode2ndEl.textContent = is2nd ? "2nd" : "";
+            modeAngleEl.textContent = angleMode;
+            if (is2nd) btn2nd.classList.add('active');
+            else btn2nd.classList.remove('active');
+
+            currentLineEl.scrollLeft = currentLineEl.scrollWidth;
+        }
+
+        function isOperator(val) {
+            return ['+', '-', '*', '/', '^', 'sq', 'inv'].includes(val);
+        }
+
+        function isControl(val) {
+            return ['2nd', 'mode', 'up', 'down', 'left', 'right', 'delete', 'clear'].includes(val);
+        }
+
+        function handleInput(val) {
+            if (is2nd && val !== '2nd') {
+                handle2ndInput(val);
+                is2nd = false;
+                updateDisplay();
+                return;
+            }
+
+            if (lastActionWasEnter && !isControl(val)) {
+                if (!isOperator(val)) {
+                    currentInput = "";
+                }
+                lastActionWasEnter = false;
+            }
+
+            switch(val) {
+                case '2nd':
+                    is2nd = !is2nd;
+                    break;
+                case 'mode':
+                    angleMode = (angleMode === 'RAD' ? 'DEG' : 'RAD');
+                    break;
+                case 'enter':
+                    evaluate();
+                    break;
+                case 'clear':
+                    currentInput = "";
+                    lastActionWasEnter = false;
+                    break;
+                case 'delete':
+                    if (currentInput.length > 0) {
+                        currentInput = currentInput.slice(0, -1);
+                    }
+                    break;
+                case 'neg':
+                    currentInput += "-";
+                    break;
+                case 'sq':
+                    currentInput += "^2";
+                    break;
+                case 'inv':
+                    currentInput += "^-1";
+                    break;
+                case 'pi':
+                    currentInput += "pi";
+                    break;
+                case 'log':
+                    currentInput += "log10(";
+                    break;
+                case 'ln':
+                    currentInput += "log(";
+                    break;
+                case 'sin':
+                case 'cos':
+                case 'tan':
+                    currentInput += val + "(";
+                    break;
+                case 'x':
+                    currentInput += "x";
+                    break;
+                case 'up':
+                    if (historyEl.lastChild) {
+                        currentInput = historyEl.lastChild.querySelector('.history-expr').textContent;
+                        lastActionWasEnter = false;
+                    }
+                    break;
+                case 'down':
+                    currentInput = "";
+                    lastActionWasEnter = false;
+                    break;
+                default:
+                    currentInput += val;
+            }
+            updateDisplay();
+        }
+
+        function handle2ndInput(val) {
+            switch(val) {
+                case 'on': // off
+                    currentInput = "";
+                    historyEl.innerHTML = "";
+                    ans = 0;
+                    lastActionWasEnter = false;
+                    break;
+                case 'neg': // ans
+                    currentInput += "ans";
+                    break;
+                case 'sin': // sin-1
+                    currentInput += "asin(";
+                    break;
+                case 'cos': // cos-1
+                    currentInput += "acos(";
+                    break;
+                case 'tan': // tan-1
+                    currentInput += "atan(";
+                    break;
+                case 'log': // 10^x
+                    currentInput += "10^";
+                    break;
+                case 'ln': // e^x
+                    currentInput += "exp(";
+                    break;
+                case '^': // sqrt
+                    currentInput += "sqrt(";
+                    break;
+                case 'prb': // angle
+                    angleMode = (angleMode === 'RAD' ? 'DEG' : 'RAD');
+                    break;
+                default:
+                    handleInput(val);
+            }
+        }
+
+        function evaluate() {
+            if (!currentInput) return;
+            let exprToSave = currentInput;
+            try {
+                let expr = currentInput;
+
+                // Redefine trig functions in scope for DEG mode
+                const scope = {
+                    ans: ans,
+                    x: 0,
+                    sin: x => angleMode === 'DEG' ? mathEngine.sin(mathEngine.unit(x, 'deg')) : mathEngine.sin(x),
+                    cos: x => angleMode === 'DEG' ? mathEngine.cos(mathEngine.unit(x, 'deg')) : mathEngine.cos(x),
+                    tan: x => angleMode === 'DEG' ? mathEngine.tan(mathEngine.unit(x, 'deg')) : mathEngine.tan(x),
+                    asin: x => {
+                        const res = mathEngine.asin(x);
+                        return angleMode === 'DEG' ? mathEngine.unit(res, 'rad').toNumber('deg') : res;
+                    },
+                    acos: x => {
+                        const res = mathEngine.acos(x);
+                        return angleMode === 'DEG' ? mathEngine.unit(res, 'rad').toNumber('deg') : res;
+                    },
+                    atan: x => {
+                        const res = mathEngine.atan(x);
+                        return angleMode === 'DEG' ? mathEngine.unit(res, 'rad').toNumber('deg') : res;
+                    }
+                };
+
+                let result = mathEngine.evaluate(expr, scope);
+
+                let formattedResult;
+                if (typeof result === 'number' || result.isBigNumber || result.isComplex) {
+                    formattedResult = mathEngine.format(result, { precision: 10 });
+                } else {
+                    formattedResult = result.toString();
+                }
+
+                const item = document.createElement('div');
+                item.className = 'history-item';
+                item.onclick = () => {
+                    currentInput = exprToSave;
+                    lastActionWasEnter = false;
+                    updateDisplay();
+                };
+
+                const exprDiv = document.createElement('div');
+                exprDiv.className = 'history-expr';
+                exprDiv.textContent = exprToSave;
+
+                const resDiv = document.createElement('div');
+                resDiv.className = 'history-res';
+                resDiv.textContent = formattedResult;
+
+                item.appendChild(exprDiv);
+                item.appendChild(resDiv);
+                historyEl.appendChild(item);
+
+                historyEl.scrollTop = historyEl.scrollHeight;
+
+                ans = result;
+                currentInput = formattedResult;
+                lastActionWasEnter = true;
+            } catch (e) {
+                console.error(e);
+                currentInput = "Error";
+                lastActionWasEnter = true;
+            }
+            updateDisplay();
+        }
+
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                handleInput(btn.getAttribute('data-val'));
+            });
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key >= '0' && e.key <= '9') handleInput(e.key);
+            if (e.key === '.') handleInput('.');
+            if (e.key === '+') handleInput('+');
+            if (e.key === '-') handleInput('-');
+            if (e.key === '*') handleInput('*');
+            if (e.key === '/') handleInput('/');
+            if (e.key === '(') handleInput('(');
+            if (e.key === ')') handleInput(')');
+            if (e.key === 'Enter') handleInput('enter');
+            if (e.key === 'Backspace') handleInput('delete');
+            if (e.key === 'Escape') handleInput('clear');
+        });
+
+        updateDisplay();
+    </script>
+</body>
+</html>
